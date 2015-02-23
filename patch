@@ -1,0 +1,63 @@
+diff -r -u bbtokentool-1.1.1-4/wdtoken-1.0.0/wdtoken.c bbtokentool-1.1.1-4_modif/wdtoken-1.0.0/wdtoken.c
+--- bbtokentool-1.1.1-4/wdtoken-1.0.0/wdtoken.c	2013-02-17 00:12:28.000000000 -0300
++++ bbtokentool-1.1.1-4_modif/wdtoken-1.0.0/wdtoken.c	2015-02-23 17:10:11.668058422 -0300
+@@ -21,6 +21,7 @@
+ #include <linux/poll.h>
+ #include <linux/init.h>
+ #include <linux/slab.h>
++#include <linux/wait.h>
+ 
+ //设定各个长度
+ //#include "../include/usbkeydrv.h"
+@@ -40,6 +41,7 @@
+ #define init_MUTEX(sem) sema_init(sem,1)
+ #define init_MUTEX_LOCKED(sem)  sema_init(sem, 0)
+ #endif
++
+ //==============================
+ //==				函数定义					==
+ //==============================
+@@ -342,6 +344,8 @@
+ //=============================
+ 
+ static ssize_t WD_read (struct file *file,char *buf, size_t len, loff_t *ppos){
++
++	DEFINE_WAIT(wait);
+ 	struct usbreader_state	*usbreader;
+ 	short			retries;
+ 	short			retval = 0;
+@@ -454,7 +458,12 @@
+ 			break;
+ 		}
+ need_sleep:
+-		interruptible_sleep_on_timeout (&usbreader->wait, RETRY_TIMEOUT);
++		//interruptible_sleep_on_timeout (&usbreader->wait, RETRY_TIMEOUT);
++
++		prepare_to_wait(&usbreader->wait, &wait, TASK_INTERRUPTIBLE);
++		schedule_timeout(RETRY_TIMEOUT);
++		finish_wait(&usbreader->wait , &wait);
++		 
+ 
+ 		//dbg ("read (%d) - retry", len);
+ 	}//for 
+@@ -468,6 +477,7 @@
+ 
+ static ssize_t WD_write (struct file *file,	const char *buf, size_t len, loff_t *ppos)
+ {
++	DEFINE_WAIT(wait);
+ 	struct usbreader_state	*usbreader;
+ 	ssize_t			bytes_written = 0;
+ 	struct __ccid_head ccid_head;
+@@ -608,7 +618,10 @@
+ 					bytes_written = -ETIME;
+ 					goto done;
+ 				}
+-				interruptible_sleep_on_timeout (&usbreader->wait,RETRY_TIMEOUT);
++				//interruptible_sleep_on_timeout (&usbreader->wait,RETRY_TIMEOUT);
++				prepare_to_wait(&usbreader->wait, &wait, TASK_INTERRUPTIBLE);
++				schedule_timeout(RETRY_TIMEOUT);
++				finish_wait(&usbreader->wait , &wait);
+ 				continue;
+ 			}else{
+ 				bytes_written = -EFAULT;
+Somente em bbtokentool-1.1.1-4_modif/wdtoken-1.0.0: .wdtoken.c.swp
